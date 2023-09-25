@@ -1,0 +1,2 @@
+export NIFCLOUD_ACCESS_KEY_ID=<Your NIFCLOUD Access Key ID>
+export NIFCLOUD_SECRET_ACCESS_KEY=<Your NIFCLOUD Secret Access Key>
