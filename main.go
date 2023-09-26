@@ -7,6 +7,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/nifcloud/nifcloud-sdk-go/nifcloud"
+	nifcloudnrn "github.com/nifcloud/nifcloud-sdk-go/nifcloud/nrn"
 	"golang.org/x/exp/slices"
 
 	"github.com/SogoKato/nifdiff/pkg/plugin"
@@ -38,10 +39,9 @@ func main() {
 	}
 }
 
-func getResource(plugins []plugin.Plugin, nrn string) (resource any, err error) {
-	nrnArr := strings.Split(nrn, ":")
-	if len(nrnArr) != 7 || nrnArr[0] != "nrn" || nrnArr[1] != "nifcloud" {
-		err = fmt.Errorf("The argument '%s' is not a valid NRN.", nrn)
+func getResource(plugins []plugin.Plugin, nrnString string) (resource any, err error) {
+	nrn, err := nifcloudnrn.Parse(nrnString)
+	if err != nil {
 		return
 	}
 	regions := []string{
@@ -53,10 +53,13 @@ func getResource(plugins []plugin.Plugin, nrn string) (resource any, err error) 
 		"jp-west-2",
 		"us-east-1",
 	}
-	if !slices.Contains(regions, nrnArr[3]) {
-		err = fmt.Errorf("The region '%s' is not available.", nrnArr[3])
+	if !slices.Contains(regions, nrn.Region) {
+		err = fmt.Errorf("The region '%s' is not available.", nrn.Region)
 		return
 	}
+	resourceSplitted := strings.SplitN(nrn.Resource, ":", 2)
+	resourceType := resourceSplitted[0]
+	resourceName := resourceSplitted[1]
 	pluginResourceMap := map[string]map[string]plugin.Resource{}
 	for i := 0; i < len(plugins); i++ {
 		pluginName := plugins[i].Name()
@@ -66,21 +69,21 @@ func getResource(plugins []plugin.Plugin, nrn string) (resource any, err error) 
 		pluginResourceMap[pluginName] = plugins[i].GetResourceMap()
 	}
 	for svcName, resourceMap := range pluginResourceMap {
-		if svcName != nrnArr[2] {
+		if svcName != nrn.Service {
 			continue
 		}
-		for resourceType, r := range resourceMap {
-			if resourceType != nrnArr[5] {
+		for rt, r := range resourceMap {
+			if rt != resourceType {
 				continue
 			}
-			cfg := newConfigWithRegion(nrnArr[3])
-			resource, err = r.Fetch(cfg, nrnArr[6])
+			cfg := newConfigWithRegion(nrn.Region)
+			resource, err = r.Fetch(cfg, resourceName)
 			return
 		}
-		err = fmt.Errorf("The resource type '%s' is not a supported resource of computing service.", nrnArr[5])
+		err = fmt.Errorf("The resource type '%s' is not a supported resource of computing service.", resourceType)
 		return
 	}
-	err = fmt.Errorf("The service '%s' is not available.", nrnArr[2])
+	err = fmt.Errorf("The service '%s' is not available.", nrn.Service)
 	return
 }
 
